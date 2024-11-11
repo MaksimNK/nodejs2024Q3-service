@@ -8,6 +8,7 @@ import {
   Put,
   HttpStatus,
   HttpException,
+  HttpCode,
 } from '@nestjs/common';
 import { GetUserDto, CreateUserDto, UpdatePasswordDto } from './dto/user.dto';
 import { UserEntity } from './user.entity';
@@ -18,11 +19,13 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
+  @HttpCode(HttpStatus.OK)
   findAll(): GetUserDto[] {
     return this.userService.getAllUsers();
   }
 
   @Get(':id')
+  @HttpCode(HttpStatus.OK)
   findOne(@Param('id') id: string): GetUserDto {
     if (!this.userService.isValidUUID(id)) {
       throw new HttpException('Invalid userId format', HttpStatus.BAD_REQUEST);
@@ -38,7 +41,8 @@ export class UserController {
   }
 
   @Post()
-  create(@Body() createUserDto: CreateUserDto): UserEntity {
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() createUserDto: CreateUserDto): GetUserDto {
     const { login, password } = createUserDto;
     if (!login || !password) {
       throw new HttpException(
@@ -53,7 +57,7 @@ export class UserController {
   updatePassword(
     @Param('id') id: string,
     @Body() updatePasswordDto: UpdatePasswordDto,
-  ): boolean {
+  ) {
     if (!this.userService.isValidUUID(id)) {
       throw new HttpException('Invalid userId format', HttpStatus.BAD_REQUEST);
     }
@@ -65,7 +69,11 @@ export class UserController {
       );
     }
     try {
-      return this.userService.updateUserPassword(updatePasswordDto, id);
+      const updatedUser = this.userService.updateUserPassword(
+        updatePasswordDto,
+        id,
+      );
+      return updatedUser;
     } catch (error) {
       if (error.message === 'User does not exist') {
         throw new HttpException(error.message, HttpStatus.NOT_FOUND);
@@ -78,6 +86,7 @@ export class UserController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id') id: string) {
     if (!this.userService.isValidUUID(id)) {
       throw new HttpException('Invalid userId format', HttpStatus.BAD_REQUEST);

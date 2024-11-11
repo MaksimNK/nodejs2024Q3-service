@@ -7,18 +7,18 @@ import { randomUUID } from 'crypto';
 export class UserService {
   private users: Map<string, UserEntity> = new Map();
 
-  createUser(createUserDto: CreateUserDto): UserEntity {
-    const { login, password } = createUserDto;
+  createUser(createUserDto: CreateUserDto): GetUserDto {
     const user: UserEntity = {
       id: randomUUID(),
-      login,
-      password,
+      login: createUserDto.login,
+      password: createUserDto.password,
       version: 1,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     this.users.set(user.id, user);
-    return user;
+    const { password, ...result } = user;
+    return result;
   }
 
   getAllUsers(): GetUserDto[] {
@@ -46,7 +46,7 @@ export class UserService {
   updateUserPassword(
     updatePasswordDto: UpdatePasswordDto,
     userId: string,
-  ): boolean {
+  ): GetUserDto {
     if (!this.isUserExist(userId)) {
       throw new Error('User does not exist');
     }
@@ -58,12 +58,17 @@ export class UserService {
     user.password = newPassword;
     user.version += 1;
     user.updatedAt = Date.now();
-    return true;
+    return {
+      id: user.id,
+      login: user.login,
+      version: user.version,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
-  deleteUser(userId: string): boolean {
+  deleteUser(userId: string): void {
     this.users.delete(userId);
-    return true;
   }
 
   isUserExist(userId: string): boolean {
