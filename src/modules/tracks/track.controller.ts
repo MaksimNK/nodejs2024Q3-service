@@ -93,6 +93,6 @@ export class TrackController {
       );
     }
     this.trackService.deleteTrack(id);
-    return { statusCode: HttpStatus.CREATED };
+    return { statusCode: HttpStatus.NO_CONTENT };
   }
 }

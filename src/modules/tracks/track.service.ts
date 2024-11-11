@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CreateTrackDto, GetTrackDto, UpdateTrackDto } from './dto/track.dto';
 import { TrackEntity } from './track.entity';
+import { FavoritesService } from '../favorites/favorites.service';
 
 @Injectable()
 export class TrackService {
@@ -16,10 +17,13 @@ export class TrackService {
       duration: track.duration,
     }));
   }
+  constructor(
+    @Inject(forwardRef(() => FavoritesService))
+    private readonly favoritesService: FavoritesService,
+  ) {}
 
   getTrackById(trackId: string): GetTrackDto | null {
     const track = this.tracks.get(trackId);
-    if (!track) return null;
     return track;
   }
 
@@ -43,8 +47,16 @@ export class TrackService {
     return this.getTrackById(trackId);
   }
 
-  deleteTrack(trackId: string): boolean {
-    return this.tracks.delete(trackId);
+  deleteTrack(trackId: string) {
+    try {
+      this.favoritesService.removeTrack(trackId);
+    } catch (error) {
+      if (error.message !== 'Track not found') {
+        console.error(`Error in removeTrackFromFavorites: ${error.message}`);
+        throw error;
+      }
+    }
+    this.tracks.delete(trackId);
   }
 
   isTrackExist(trackId: string): boolean {
@@ -55,5 +67,20 @@ export class TrackService {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       uuid,
     );
+  }
+  removeArtistFromTracks(artistId: string) {
+    this.tracks.forEach((track) => {
+      if (track.artistId === artistId) {
+        track.artistId = null;
+      }
+    });
+  }
+
+  removeAlbumFromTracks(albumId: string) {
+    this.tracks.forEach((track) => {
+      if (track.albumId === albumId) {
+        track.albumId = null;
+      }
+    });
   }
 }
