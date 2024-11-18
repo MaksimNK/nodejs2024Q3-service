@@ -1,80 +1,76 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { UserEntity } from './user.entity';
 import { CreateUserDto, GetUserDto, UpdatePasswordDto } from './dto/user.dto';
 import { randomUUID } from 'crypto';
+import { plainToClass } from 'class-transformer';
+import { DbService } from 'src/db.service';
 
 @Injectable()
 export class UserService {
-  private users: Map<string, UserEntity> = new Map();
+  constructor(private readonly dbService: DbService) {}
 
-  createUser(createUserDto: CreateUserDto): GetUserDto {
-    const user: UserEntity = {
-      id: randomUUID(),
-      login: createUserDto.login,
-      password: createUserDto.password,
-      version: 1,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    this.users.set(user.id, user);
-    const { password, ...result } = user;
-    return result;
+  async createUser(createUserDto: CreateUserDto) {
+    const newUser = await this.dbService.user.create({
+      data: createUserDto,
+    });
+
+    return plainToClass(UserEntity, newUser);
   }
 
-  getAllUsers(): GetUserDto[] {
-    return Array.from(this.users.values()).map((user) => ({
-      id: user.id,
-      login: user.login,
-      version: user.version,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    }));
+  async getAllUsers() {
+    const users = await this.dbService.user.findMany();
+    return users.map((user) => plainToClass(UserEntity, user));
   }
 
-  getUserById(userId: string): GetUserDto | null {
-    const user = this.users.get(userId);
-    if (!user) return null;
-    return {
-      id: user.id,
-      login: user.login,
-      version: user.version,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
-  }
-
-  updateUserPassword(
-    updatePasswordDto: UpdatePasswordDto,
-    userId: string,
-  ): GetUserDto {
-    if (!this.isUserExist(userId)) {
-      throw new Error('User does not exist');
+  async getUserById(id: string) {
+    if (!this.isValidUUID(id)) {
+      throw new BadRequestException('Id is not a valid uuid');
     }
-    const { oldPassword, newPassword } = updatePasswordDto;
-    const user = this.users.get(userId);
-    if (user.password !== oldPassword) {
-      throw new Error('Old password is incorrect');
+
+    const user = await this.dbService.user.findUnique({
+      where: { id },
+    });
+    if (!user) {
+      throw new NotFoundException('User with this id does not exist');
     }
-    user.password = newPassword;
-    user.version += 1;
-    user.updatedAt = Date.now();
-    return {
-      id: user.id,
-      login: user.login,
-      version: user.version,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+
+    return user;
   }
 
-  deleteUser(userId: string): void {
-    this.users.delete(userId);
+  async updateUserPassword(updatePasswordDto: UpdatePasswordDto, id: string) {
+    const user = await this.getUserById(id);
+    if (user) {
+      const userStoredPassword = user.password;
+
+      if (updatePasswordDto.oldPassword !== userStoredPassword) {
+        throw new ForbiddenException('Wrong old password');
+      }
+
+      const updatedUser = this.dbService.user.update({
+        where: { id },
+        data: {
+          password: updatePasswordDto.newPassword,
+          version: user.version + 1,
+        },
+      });
+
+      return plainToClass(UserEntity, updatedUser);
+    }
   }
 
-  isUserExist(userId: string): boolean {
-    return this.users.has(userId);
+  async deleteUser(id: string) {
+    const user = await this.getUserById(id);
+    if (user) {
+      await this.dbService.user.delete({
+        where: { id },
+      });
+    }
   }
-
   isValidUUID(uuid: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       uuid,

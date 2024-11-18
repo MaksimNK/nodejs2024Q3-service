@@ -1,86 +1,81 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CreateTrackDto, GetTrackDto, UpdateTrackDto } from './dto/track.dto';
 import { TrackEntity } from './track.entity';
 import { FavoritesService } from '../favorites/favorites.service';
+import { DbService } from 'src/db.service';
 
 @Injectable()
 export class TrackService {
-  private tracks: Map<string, TrackEntity> = new Map();
-
-  getAllTracks(): GetTrackDto[] {
-    return Array.from(this.tracks.values()).map((track) => ({
-      id: track.id,
-      name: track.name,
-      artistId: track.artistId,
-      albumId: track.albumId,
-      duration: track.duration,
-    }));
+  async getAllTracks() {
+    return await this.dbService.track.findMany();
   }
-  constructor(
-    @Inject(forwardRef(() => FavoritesService))
-    private readonly favoritesService: FavoritesService,
-  ) {}
+  constructor(private readonly dbService: DbService) {}
 
-  getTrackById(trackId: string): GetTrackDto | null {
-    const track = this.tracks.get(trackId);
+  async getTrackById(id: string) {
+    if (!this.isValidUUID(id)) {
+      throw new BadRequestException('Id is not a valid uuid');
+    }
+    const track = await this.dbService.track.findUnique({
+      where: { id },
+    });
+    if (!track) {
+      throw new NotFoundException('Track with this id does not exist');
+    }
+
     return track;
   }
 
-  createTrack(createTrackDto: CreateTrackDto): GetTrackDto {
-    const track: TrackEntity = {
-      id: randomUUID(),
-      ...createTrackDto,
-    };
-    this.tracks.set(track.id, track);
-    return this.getTrackById(track.id);
+  async createTrack(createTrackDto: CreateTrackDto) {
+    createTrackDto.artistId &&
+      (await this.dbService.artist.findUnique({
+        where: { id: createTrackDto.artistId },
+      }));
+
+    createTrackDto.albumId &&
+      (await this.dbService.album.findUnique({
+        where: { id: createTrackDto.albumId },
+      }));
+
+    return await this.dbService.track.create({ data: createTrackDto });
   }
 
-  updateTrack(
-    trackId: string,
-    updateTrackDto: UpdateTrackDto,
-  ): GetTrackDto | null {
-    const track = this.tracks.get(trackId);
-    if (!track) return null;
-    Object.assign(track, updateTrackDto);
-    this.tracks.set(trackId, track);
-    return this.getTrackById(trackId);
-  }
+  async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {
+    const track = await this.getTrackById(id);
+    if (track) {
+      updateTrackDto.artistId &&
+        (await this.dbService.artist.findUnique({
+          where: { id: updateTrackDto.artistId },
+        }));
 
-  deleteTrack(trackId: string) {
-    try {
-      this.favoritesService.removeTrack(trackId);
-    } catch (error) {
-      if (error.message !== 'Track not found') {
-        console.error(`Error in removeTrackFromFavorites: ${error.message}`);
-        throw error;
-      }
+      updateTrackDto.albumId &&
+        (await this.dbService.album.findUnique({
+          where: { id: updateTrackDto.albumId },
+        }));
+
+      return await this.dbService.track.update({
+        where: { id },
+        data: updateTrackDto,
+      });
     }
-    this.tracks.delete(trackId);
   }
 
-  isTrackExist(trackId: string): boolean {
-    return this.tracks.has(trackId);
+  async deleteTrack(id: string) {
+    const track = await this.getTrackById(id);
+    if (track) {
+      return await this.dbService.track.delete({ where: { id } });
+    }
   }
 
   isValidUUID(uuid: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       uuid,
     );
-  }
-  removeArtistFromTracks(artistId: string) {
-    this.tracks.forEach((track) => {
-      if (track.artistId === artistId) {
-        track.artistId = null;
-      }
-    });
-  }
-
-  removeAlbumFromTracks(albumId: string) {
-    this.tracks.forEach((track) => {
-      if (track.albumId === albumId) {
-        track.albumId = null;
-      }
-    });
   }
 }

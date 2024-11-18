@@ -3,67 +3,68 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateAlbumDto, UpdateAlbumDto, GetAlbumDto } from './dto/album.dto';
 import { randomUUID } from 'crypto';
 import { AlbumEntity } from './album.entity';
 import { TrackService } from '../tracks/track.service';
 import { FavoritesService } from '../favorites/favorites.service';
+import { DbService } from 'src/db.service';
 
 @Injectable()
 export class AlbumService {
-  private albums: Map<string, AlbumEntity> = new Map();
-
   constructor(
     @Inject(forwardRef(() => TrackService))
     private readonly trackService: TrackService,
     @Inject(forwardRef(() => FavoritesService))
     private readonly favoritesService: FavoritesService,
+    private readonly dbService: DbService,
   ) {}
 
-  createAlbum(createAlbumDto: CreateAlbumDto): GetAlbumDto {
-    const album: AlbumEntity = {
-      id: randomUUID(),
-      ...createAlbumDto,
-    };
-    this.albums.set(album.id, album);
-    return album;
+  async createAlbum(createAlbumDto: CreateAlbumDto) {
+    createAlbumDto.artistId &&
+      (await this.dbService.artist.findUnique({
+        where: { id: createAlbumDto.artistId },
+      }));
+
+    return await this.dbService.album.create({ data: createAlbumDto });
   }
 
-  getAllAlbums(): GetAlbumDto[] {
-    return Array.from(this.albums.values());
+  async getAllAlbums() {
+    return await this.dbService.album.findMany();
   }
 
-  getAlbumById(albumId: string): GetAlbumDto {
-    const album = this.albums.get(albumId);
+  async getAlbumById(id: string) {
+    if (!this.isValidUUID(id)) {
+      throw new BadRequestException('Id is not a valid uuid');
+    }
+    const album = await this.dbService.album.findUnique({ where: { id } });
     if (!album) {
-      throw new NotFoundException('Album not found');
+      throw new NotFoundException('Album with this id does not exist');
     }
     return album;
   }
 
-  updateAlbum(updateAlbumDto: UpdateAlbumDto, albumId: string): GetAlbumDto {
-    const album = this.albums.get(albumId);
-    const updatedAlbum: AlbumEntity = {
-      ...album,
-      ...updateAlbumDto,
-    };
-    this.albums.set(albumId, updatedAlbum);
-    return updatedAlbum;
-  }
-
-  deleteAlbum(albumId: string): void {
-    if (!this.isAlbumExist(albumId)) {
-      throw new NotFoundException('Album not found');
+  async updateAlbum(updateAlbumDto: UpdateAlbumDto, id: string) {
+    const album = await this.getAlbumById(id);
+    if (album) {
+      updateAlbumDto.artistId &&
+        (await this.dbService.artist.findUnique({
+          where: { id: updateAlbumDto.artistId },
+        }));
+      return await this.dbService.album.update({
+        where: { id },
+        data: updateAlbumDto,
+      });
     }
-    this.trackService.removeAlbumFromTracks(albumId);
-    this.favoritesService.removeAlbum(albumId);
-
-    this.albums.delete(albumId);
   }
 
-  isAlbumExist(albumId: string): boolean {
-    return this.albums.has(albumId);
+  async deleteAlbum(id: string) {
+    const album = await this.getAlbumById(id);
+    if (album) {
+      return await this.dbService.album.delete({ where: { id } });
+    }
   }
 
   isValidUUID(uuid: string): boolean {
@@ -86,13 +87,5 @@ export class AlbumService {
     }
 
     return true;
-  }
-
-  removeArtistFromAlbums(artistId: string) {
-    this.albums.forEach((album) => {
-      if (album.artistId === artistId) {
-        album.artistId = null;
-      }
-    });
   }
 }
