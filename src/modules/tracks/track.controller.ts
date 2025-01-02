@@ -18,12 +18,12 @@ export class TrackController {
   constructor(private readonly trackService: TrackService) {}
 
   @Get()
-  findAll(): GetTrackDto[] {
+  findAll() {
     return this.trackService.getAllTracks();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): GetTrackDto {
+  findOne(@Param('id') id: string) {
     if (!this.trackService.isValidUUID(id)) {
       throw new HttpException('Invalid trackId format', HttpStatus.BAD_REQUEST);
     }
@@ -39,7 +39,7 @@ export class TrackController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createTrackDto: CreateTrackDto): GetTrackDto {
+  create(@Body() createTrackDto: CreateTrackDto) {
     const { name, duration } = createTrackDto;
     if (!duration || !name) {
       throw new HttpException('Invalid dto', HttpStatus.BAD_REQUEST);
@@ -49,10 +49,7 @@ export class TrackController {
   }
 
   @Put(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateTrackDto: UpdateTrackDto,
-  ): GetTrackDto {
+  update(@Param('id') id: string, @Body() updateTrackDto: UpdateTrackDto) {
     const { name, artistId, albumId, duration } = updateTrackDto;
     if (!this.trackService.isValidUUID(id)) {
       throw new HttpException('Invalid trackId format', HttpStatus.BAD_REQUEST);
@@ -85,12 +82,6 @@ export class TrackController {
   delete(@Param('id') id: string) {
     if (!this.trackService.isValidUUID(id)) {
       throw new HttpException('Invalid trackId format', HttpStatus.BAD_REQUEST);
-    }
-    if (!this.trackService.isTrackExist(id)) {
-      throw new HttpException(
-        `Track with id ${id} not found`,
-        HttpStatus.NOT_FOUND,
-      );
     }
     this.trackService.deleteTrack(id);
     return { statusCode: HttpStatus.NO_CONTENT };

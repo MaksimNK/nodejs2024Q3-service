@@ -1,15 +1,20 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AlbumService } from '../albums/album.service';
 import { TrackService } from '../tracks/track.service';
 import { ArtistEntity } from './artist.entity';
 import { CreateArtistDto } from './dto/artist.dto';
 import { FavoritesService } from '../favorites/favorites.service';
+import { DbService } from 'src/db.service';
 
 @Injectable()
 export class ArtistService {
-  private artists: Map<string, ArtistEntity> = new Map();
-
   constructor(
     @Inject(forwardRef(() => AlbumService))
     private readonly albumService: AlbumService,
@@ -17,47 +22,43 @@ export class ArtistService {
     private readonly trackService: TrackService,
     @Inject(forwardRef(() => FavoritesService))
     private readonly favoritesService: FavoritesService,
+    private readonly dbService: DbService,
   ) {}
 
-  createArtist(artistDto: CreateArtistDto): ArtistEntity {
-    const { name, grammy } = artistDto;
-    const artist = {
-      id: randomUUID(),
-      name,
-      grammy,
-    };
+  async createArtist(artistDto: CreateArtistDto) {
+    return await this.dbService.artist.create({ data: artistDto });
+  }
 
-    this.artists.set(artist.id, artist);
+  async getAllArtists() {
+    return await this.dbService.artist.findMany();
+  }
+
+  async getArtistById(id: string) {
+    if (this.isValidUUID(id)) {
+      throw new BadRequestException('Id is not a valid uuid');
+    }
+    const artist = await this.dbService.artist.findUnique({ where: { id } });
+    if (!artist) {
+      throw new NotFoundException('Artist with this id does not exist');
+    }
     return artist;
   }
 
-  getAllArtists(): ArtistEntity[] {
-    return Array.from(this.artists.values());
+  async updateArtistInfo(updateDto: CreateArtistDto, id: string) {
+    const artist = await this.getArtistById(id);
+    if (artist) {
+      return await this.dbService.artist.update({
+        where: { id },
+        data: updateDto,
+      });
+    }
   }
 
-  getArtistById(artistId: string): ArtistEntity | null {
-    return this.artists.get(artistId) || null;
-  }
-
-  updateArtistInfo(updateDto: CreateArtistDto, artistId: string): ArtistEntity {
-    const artist = this.artists.get(artistId);
-
-    artist.name = updateDto.name;
-    artist.grammy = updateDto.grammy;
-
-    return artist;
-  }
-
-  deleteArtist(artistId: string) {
-    this.albumService.removeArtistFromAlbums(artistId);
-    this.trackService.removeArtistFromTracks(artistId);
-    this.favoritesService.removeArtist(artistId);
-
-    this.artists.delete(artistId);
-  }
-
-  isArtistExist(artistId: string): boolean {
-    return this.artists.has(artistId);
+  async deleteArtist(id: string) {
+    const artist = await this.getArtistById(id);
+    if (artist) {
+      return await this.dbService.artist.delete({ where: { id } });
+    }
   }
 
   isValidUUID(uuid: string): boolean {

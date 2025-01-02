@@ -67,13 +67,6 @@ export class ArtistController {
       );
     }
 
-    if (!this.artistService.isArtistExist(id)) {
-      throw new HttpException(
-        `Artist with id ${id} not found`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
     if (!this.artistService.validateRequestBody(updateArtistDto)) {
       throw new HttpException(
         'Request body must contain a valid name (string) and grammy (boolean)',
@@ -91,13 +84,6 @@ export class ArtistController {
       throw new HttpException(
         'Invalid artistId format',
         HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    if (!this.artistService.isArtistExist(id)) {
-      throw new HttpException(
-        `Artist with id ${id} not found`,
-        HttpStatus.NOT_FOUND,
       );
     }
 

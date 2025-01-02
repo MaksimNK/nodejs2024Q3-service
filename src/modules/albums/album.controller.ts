@@ -18,12 +18,12 @@ export class AlbumController {
   constructor(private readonly albumService: AlbumService) {}
 
   @Get()
-  findAll(): GetAlbumDto[] {
+  findAll() {
     return this.albumService.getAllAlbums();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): GetAlbumDto {
+  findOne(@Param('id') id: string) {
     if (!this.albumService.isValidUUID(id)) {
       throw new HttpException('Invalid albumId format', HttpStatus.BAD_REQUEST);
     }
@@ -34,7 +34,7 @@ export class AlbumController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createAlbumDto: CreateAlbumDto): GetAlbumDto {
+  create(@Body() createAlbumDto: CreateAlbumDto) {
     if (!this.albumService.validateRequestBody(createAlbumDto)) {
       throw new HttpException('Invalid data', HttpStatus.BAD_REQUEST);
     }
@@ -49,15 +49,9 @@ export class AlbumController {
   }
 
   @Put(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateAlbumDto: UpdateAlbumDto,
-  ): GetAlbumDto {
+  update(@Param('id') id: string, @Body() updateAlbumDto: UpdateAlbumDto) {
     if (!this.albumService.isValidUUID(id)) {
       throw new HttpException('Invalid albumId format', HttpStatus.BAD_REQUEST);
-    }
-    if (!this.albumService.isAlbumExist(id)) {
-      throw new HttpException('Does not exist', HttpStatus.NOT_FOUND);
     }
     if (!this.albumService.validateRequestBody(updateAlbumDto)) {
       throw new HttpException('Invalid data', HttpStatus.BAD_REQUEST);

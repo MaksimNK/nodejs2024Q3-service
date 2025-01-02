@@ -20,13 +20,13 @@ export class UserController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  findAll(): GetUserDto[] {
+  findAll() {
     return this.userService.getAllUsers();
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  findOne(@Param('id') id: string): GetUserDto {
+  findOne(@Param('id') id: string) {
     if (!this.userService.isValidUUID(id)) {
       throw new HttpException('Invalid userId format', HttpStatus.BAD_REQUEST);
     }
@@ -42,7 +42,7 @@ export class UserController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createUserDto: CreateUserDto): GetUserDto {
+  create(@Body() createUserDto: CreateUserDto) {
     const { login, password } = createUserDto;
     if (!login || !password) {
       throw new HttpException(
@@ -91,12 +91,7 @@ export class UserController {
     if (!this.userService.isValidUUID(id)) {
       throw new HttpException('Invalid userId format', HttpStatus.BAD_REQUEST);
     }
-    if (!this.userService.isUserExist(id)) {
-      throw new HttpException(
-        `User with id ${id} not found`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
+
     this.userService.deleteUser(id);
     return { statusCode: HttpStatus.NO_CONTENT };
   }
